@@ -1,0 +1,121 @@
+# =============== #
+# Unity Generated #
+# =============== #
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# =============== #
+# Asset Meta Data #
+# =============== #
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# =============== #
+# Unity3D Generated #
+# =============== #
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# =============== #
+# Visual Studio  #
+# =============== #
+.vs/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+*.rsuser
+*.sln.docstates
+
+# =============== #
+# JetBrains Rider #
+# =============== #
+.idea/
+*.iml
+
+# =============== #
+# VS Code        #
+# =============== #
+.vscode/
+
+# =============== #
+# OS Generated   #
+# =============== #
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =============== #
+# Builds         #
+# =============== #
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.exe
+
+# =============== #
+# Crashlytics    #
+# =============== #
+crashlytics-build.properties
+sysinfo.txt
+
+# =============== #
+# Plastic SCM    #
+# =============== #
+*.ignore.conf
+*.orig
+
+# =============== #
+# Code Coverage  #
+# =============== #
+[Cc]ode[Cc]overage/
+
+# =============== #
+# Profile Analysis #
+# =============== #
+[Aa]nalysis/
+
+# =============== #
+# Packages       #
+# =============== #
+# Uncomment below if using local packages
+# Packages/
+
+# =============== #
+# Video/Recordings #
+# =============== #
+*.mp4
+*.mov
+*.avi
