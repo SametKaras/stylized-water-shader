@@ -1,10 +1,10 @@
 # 🔬 Technical Breakdown: Stylized Water Shader
 
-Bu döküman, water shader'daki her tekniğin detaylı açıklamasını içerir. Her bölüm şunları kapsar: tekniğin amacı, matematiksel temeli, implementasyon detayları ve kod örnekleri.
+This document provides a detailed explanation of each technique used in the water shader. Each section covers: the purpose of the technique, mathematical foundations, implementation details, and code examples.
 
 ---
 
-## İçindekiler
+## Table of Contents
 
 1. [Depth-Based Coloring](#1-depth-based-coloring)
 2. [Gerstner Waves](#2-gerstner-waves)
@@ -22,25 +22,25 @@ Bu döküman, water shader'daki her tekniğin detaylı açıklamasını içerir.
 
 ## 1. Depth-Based Coloring
 
-### Amaç
-Gerçek suda olduğu gibi, sığ bölgelerde açık renk (turkuaz), derin bölgelerde koyu renk (lacivert) geçişi sağlar.
+### Purpose
+Creates realistic color transitions like real water: light colors (turquoise) in shallow areas and dark colors (navy blue) in deep areas.
 
-### Nasıl Çalışır
-1. Unity'nin depth texture'ından sahne derinliğini oku
-2. Su yüzeyinin derinliğini hesapla
-3. İkisi arasındaki farkı bul (waterDepth)
-4. Bu değere göre iki renk arasında lerp yap
+### How It Works
+1. Read scene depth from Unity's depth texture
+2. Calculate the water surface depth
+3. Find the difference between them (waterDepth)
+4. Lerp between two colors based on this value
 
-### Matematiksel Temel
+### Mathematical Basis
 ```
 waterDepth = sceneDepth - surfaceDepth
 depthFactor = saturate(waterDepth / maxDistance)
 finalColor = lerp(shallowColor, deepColor, depthFactor)
 ```
 
-### Kod
+### Code
 ```hlsl
-// Fragment shader'da
+// In fragment shader
 float2 screenUV = i.screenPos.xy / i.screenPos.w;
 float sceneDepth = LinearEyeDepth(tex2D(_CameraDepthTexture, screenUV).r);
 float surfaceDepth = i.screenPos.w;
@@ -50,36 +50,36 @@ float depthFactor = saturate(waterDepth / _DepthMaxDistance);
 float4 waterColor = lerp(_ShallowColor, _DeepColor, depthFactor);
 ```
 
-### Gereksinimler
-- Kamerada `DepthTextureMode.Depth` aktif olmalı
-- `EnableDepthTexture.cs` script'i bunu otomatik yapar
+### Requirements
+- Camera must have `DepthTextureMode.Depth` enabled
+- `EnableDepthTexture.cs` script handles this automatically
 
 ---
 
 ## 2. Gerstner Waves
 
-### Amaç
-Fiziksel olarak doğru okyanus dalgaları simülasyonu. Basit sinüs dalgalarından farklı olarak, Gerstner dalgaları:
-- Sivri tepeler ve yuvarlak çukurlar oluşturur
-- Vertex'leri hem dikey hem yatay hareket ettirir
-- Gerçek su davranışını taklit eder
+### Purpose
+Physically accurate ocean wave simulation. Unlike simple sine waves, Gerstner waves:
+- Create sharp peaks and rounded troughs
+- Move vertices both vertically and horizontally
+- Mimic real water behavior
 
-### Matematiksel Temel
-Gerstner dalga formülü:
+### Mathematical Basis
+Gerstner wave formula:
 ```
 P(x,z,t) = [x + Σ(Qi * Ai * Di.x * cos(wi * Di · (x,z) + φi * t))]
            [Σ(Ai * sin(wi * Di · (x,z) + φi * t))]
            [z + Σ(Qi * Ai * Di.y * cos(wi * Di · (x,z) + φi * t))]
 
-Burada:
-- Qi = steepness (dalga dikliği)
-- Ai = amplitude (dalga yüksekliği)
-- Di = direction (dalga yönü)
+Where:
+- Qi = steepness (wave sharpness)
+- Ai = amplitude (wave height)
+- Di = direction (wave direction)
 - wi = 2π / wavelength
 - φi = phase velocity = √(g / wi)
 ```
 
-### Kod
+### Code
 ```hlsl
 float3 GerstnerWave(float4 wave, float3 p, inout float3 tangent, inout float3 binormal)
 {
@@ -91,7 +91,7 @@ float3 GerstnerWave(float4 wave, float3 p, inout float3 tangent, inout float3 bi
     float f = k * (dot(d, p.xz) - c * _Time.y * _WaveSpeed);
     float a = steepness / k;                  // Amplitude
     
-    // Tangent ve binormal güncelle (normal hesabı için)
+    // Update tangent and binormal (for normal calculation)
     tangent += float3(
         -d.x * d.x * (steepness * sin(f)),
         d.x * (steepness * cos(f)),
@@ -112,14 +112,14 @@ float3 GerstnerWave(float4 wave, float3 p, inout float3 tangent, inout float3 bi
 }
 ```
 
-### Kullanım
+### Usage
 ```hlsl
-// Birden fazla dalga toplama
+// Sum multiple waves
 p += GerstnerWave(_WaveA, worldPos, tangent, binormal);
 p += GerstnerWave(_WaveB, worldPos, tangent, binormal);
 p += GerstnerWave(_WaveC, worldPos, tangent, binormal);
 
-// Normal hesapla
+// Calculate normal
 float3 normal = normalize(cross(binormal, tangent));
 ```
 
@@ -127,30 +127,30 @@ float3 normal = normalize(cross(binormal, tangent));
 
 ## 3. Normal Mapping & UV Animation
 
-### Amaç
-Su yüzeyinde küçük dalgacıklar ve detay ekler. İki katman normal map farklı yönlerde hareket ederek organik görünüm sağlar.
+### Purpose
+Adds small ripples and detail to the water surface. Two normal map layers moving in different directions create an organic appearance.
 
-### Nasıl Çalışır
-1. İki farklı UV seti oluştur (farklı hız ve yön)
-2. Her UV için normal map sample et
-3. İki normal'i blend et
-4. World normal'e perturb uygula
+### How It Works
+1. Create two different UV sets (different speed and direction)
+2. Sample normal map for each UV
+3. Blend the two normals
+4. Apply perturbation to world normal
 
-### Kod
+### Code
 ```hlsl
-// İki katman UV animasyonu
+// Two-layer UV animation
 float2 uv1 = i.uv * _NormalScale + _Time.y * _NormalSpeed * float2(1, 0.5);
 float2 uv2 = i.uv * _NormalScale * 0.8 + _Time.y * _NormalSpeed * float2(-0.5, 1);
 
-// Normal map sample
+// Normal map sampling
 float3 normal1 = UnpackNormal(tex2D(_NormalMap, uv1));
 float3 normal2 = UnpackNormal(tex2D(_NormalMap, uv2));
 
-// Blend (RNM - Reoriented Normal Mapping daha doğru ama basit blend de çalışır)
+// Blend (RNM - Reoriented Normal Mapping is more accurate but simple blend works too)
 float3 normalBlend = normalize(normal1 + normal2);
 normalBlend.xy *= _NormalStrength;
 
-// World normal'e uygula
+// Apply to world normal
 float3 worldNormal = normalize(i.worldNormal + float3(normalBlend.x, 0, normalBlend.y) * 0.3);
 ```
 
@@ -158,27 +158,27 @@ float3 worldNormal = normalize(i.worldNormal + float3(normalBlend.x, 0, normalBl
 
 ## 4. Fresnel Effect
 
-### Amaç
-Bakış açısına göre yansıma miktarını değiştirir:
-- Dik bakınca: Su içi görünür (az yansıma)
-- Yatay bakınca: Yansıma güçlenir
+### Purpose
+Changes reflection amount based on viewing angle:
+- Looking straight down: Water interior visible (less reflection)
+- Looking at grazing angle: Reflection intensifies
 
-### Matematiksel Temel
+### Mathematical Basis
 Schlick Fresnel Approximation:
 ```
 F = F0 + (1 - F0) * (1 - cos(θ))^5
 
-Basitleştirilmiş versiyon:
+Simplified version:
 fresnel = (1 - dot(viewDir, normal))^power
 ```
 
-### Kod
+### Code
 ```hlsl
 float3 viewDir = normalize(_WorldSpaceCameraPos - i.worldPos);
 float fresnel = 1.0 - saturate(dot(viewDir, worldNormal));
 fresnel = pow(fresnel, _FresnelPower) * _FresnelStrength;
 
-// Kullanım
+// Usage
 finalColor = lerp(finalColor, reflectionColor, fresnel);
 ```
 
@@ -186,46 +186,46 @@ finalColor = lerp(finalColor, reflectionColor, fresnel);
 
 ## 5. Refraction (GrabPass)
 
-### Amaç
-Su altındaki nesnelerin bükülmüş/distorted görünmesini sağlar.
+### Purpose
+Makes underwater objects appear bent/distorted.
 
-### Nasıl Çalışır
-1. GrabPass ile su render edilmeden önceki ekranı yakala
-2. Normal map'e göre UV koordinatlarını offset et
-3. Distorted UV ile grab texture'ı sample et
+### How It Works
+1. Capture the screen before water is rendered using GrabPass
+2. Offset UV coordinates based on normal map
+3. Sample grab texture with distorted UV
 
-### Kod
+### Code
 ```hlsl
-// Shader başında
+// At shader start
 GrabPass { "_GrabTexture" }
 
-// Fragment shader'da
+// In fragment shader
 float2 refractionOffset = normalBlend.xy * _RefractionStrength;
 float2 grabUV = (i.grabPos.xy + refractionOffset) / i.grabPos.w;
 float3 refractionColor = tex2D(_GrabTexture, grabUV).rgb;
 ```
 
-### Not
-- Derinliğe göre refraction azalır (derin suda daha az görünürlük)
-- Underwater fog ile kombine edilebilir
+### Note
+- Refraction decreases with depth (less visibility in deep water)
+- Can be combined with underwater fog
 
 ---
 
 ## 6. Caustics (Voronoi)
 
-### Amaç
-Su altında ışığın oluşturduğu hareketli desenler. Havuz tabanındaki dans eden ışık efekti.
+### Purpose
+Moving patterns created by light underwater. The dancing light effect seen at pool bottoms.
 
-### Nasıl Çalışır
-1. Voronoi noise pattern oluştur
-2. İki katman farklı scale ve hızda
-3. Ters çevir (1 - voronoi) ve güçlendir
-4. Derinliğe göre intensity azalt
+### How It Works
+1. Generate Voronoi noise pattern
+2. Two layers at different scales and speeds
+3. Invert (1 - voronoi) and intensify
+4. Reduce intensity based on depth
 
-### Matematiksel Temel
-Voronoi: Her pixel için en yakın rastgele noktaya mesafe hesapla.
+### Mathematical Basis
+Voronoi: Calculate distance to nearest random point for each pixel.
 
-### Kod
+### Code
 ```hlsl
 float2 voronoiRandomVector(float2 uv, float offset)
 {
@@ -257,7 +257,7 @@ float caustics(float2 uv, float time)
 {
     float c1 = voronoi(uv, time);
     float c2 = voronoi(uv * 1.3 + 5.0, time * 1.2);
-    c1 = pow(1.0 - c1, 3.0);  // Ters çevir ve güçlendir
+    c1 = pow(1.0 - c1, 3.0);  // Invert and intensify
     c2 = pow(1.0 - c2, 3.0);
     return (c1 + c2) * 0.5;
 }
@@ -267,16 +267,16 @@ float caustics(float2 uv, float time)
 
 ## 7. Flow Maps
 
-### Amaç
-Suyun belirli bir yöne akmasını simüle eder (nehir, akarsu efekti).
+### Purpose
+Simulates water flowing in a specific direction (river, stream effect).
 
-### Nasıl Çalışır
-1. Flow vector oku (texture veya uniform)
-2. İki fazlı UV hesapla (kesintisiz döngü için)
-3. Her faz için texture sample et
-4. Fazları weight'e göre blend et
+### How It Works
+1. Read flow vector (from texture or uniform)
+2. Calculate two-phase UV (for seamless looping)
+3. Sample texture for each phase
+4. Blend phases based on weight
 
-### Matematiksel Temel
+### Mathematical Basis
 ```
 Phase A: progress = frac(time)
 Phase B: progress = frac(time + 0.5)
@@ -284,10 +284,10 @@ Phase B: progress = frac(time + 0.5)
 UV_A = uv - flowVector * progressA
 UV_B = uv - flowVector * progressB
 
-Weight = 1 - abs(1 - 2 * progress)  // Üçgen dalga
+Weight = 1 - abs(1 - 2 * progress)  // Triangle wave
 ```
 
-### Kod
+### Code
 ```hlsl
 float3 FlowUVW(float2 uv, float2 flowVector, float time, bool flowB)
 {
@@ -300,7 +300,7 @@ float3 FlowUVW(float2 uv, float2 flowVector, float time, bool flowB)
     return uvw;
 }
 
-// Kullanım
+// Usage
 float3 uvwA = FlowUVW(uv, flowVector, time, false);
 float3 uvwB = FlowUVW(uv, flowVector, time, true);
 
@@ -313,23 +313,23 @@ float3 normalBlend = normalize(normalA * uvwA.z + normalB * uvwB.z);
 
 ## 8. Subsurface Scattering (SSS)
 
-### Amaç
-Işığın su içinden geçerken saçılmasını simüle eder. Dalga tepelerinde güneş arkadan geldiğinde yeşilimsi parıltı.
+### Purpose
+Simulates light scattering as it passes through water. Creates a greenish glow at wave peaks when sunlight comes from behind.
 
-### Nasıl Çalışır
-1. Işık yönünü normal ile distort et
-2. View direction ile negatif dot product al
-3. Dalga yüksekliğine göre modüle et
+### How It Works
+1. Distort light direction with normal
+2. Take negative dot product with view direction
+3. Modulate based on wave height
 
-### Kod
+### Code
 ```hlsl
-// SSS hesaplama
+// SSS calculation
 float3 H = normalize(lightDir + worldNormal * _SSSDistortion);
 float VdotH = pow(saturate(dot(viewDir, -H)), _SSSPower);
 float waveHeightFactor = saturate(i.waveHeight * 2 + 0.5);
 float3 sss = _SSSColor.rgb * VdotH * _SSSStrength * waveHeightFactor;
 
-// Dalga yüksekliği vertex shader'dan gelir
+// Wave height comes from vertex shader
 o.waveHeight = p.y - originalPos.y;
 ```
 
@@ -337,9 +337,9 @@ o.waveHeight = p.y - originalPos.y;
 
 ## 9. Shore Waves & Foam
 
-### Amaç
-- Shore Waves: Kıyıya vuran dalgalar
-- Foam: Nesne kenarlarında ve kıyıda köpük
+### Purpose
+- Shore Waves: Waves breaking at the shoreline
+- Foam: Foam at object edges and shoreline
 
 ### Shore Waves
 ```hlsl
@@ -347,14 +347,14 @@ float ShoreWave(float shoreDepth, float2 worldXZ)
 {
     float shorePhase = shoreDepth * _ShoreWaveFrequency - _Time.y * _ShoreWaveSpeed;
     float wave = sin(shorePhase) * 0.5 + 0.5;
-    wave = pow(wave, 2.0);  // Keskin dalga tepeleri
+    wave = pow(wave, 2.0);  // Sharp wave peaks
     return wave * _ShoreWaveAmplitude * saturate(1.0 - shoreDepth / _ShoreDistance);
 }
 ```
 
 ### Foam Texture
 ```hlsl
-// İki katman foam texture (daha organik)
+// Two-layer foam texture (more organic)
 float2 foamUV1 = i.worldPos.xz * _FoamScale * 0.1 + _Time.y * _FoamSpeed * float2(1, 0.5);
 float2 foamUV2 = i.worldPos.xz * _FoamScale * 0.1 * 0.8 + _Time.y * _FoamSpeed * float2(-0.5, 1);
 
@@ -362,7 +362,7 @@ float foamTex1 = tex2D(_FoamTexture, foamUV1).r;
 float foamTex2 = tex2D(_FoamTexture, foamUV2).r;
 float foamTexture = (foamTex1 + foamTex2) * 0.5;
 
-// Edge foam (derinliğe göre)
+// Edge foam (based on depth)
 float edgeFoamMask = 1.0 - saturate(waterDepth / _FoamDistance);
 float edgeFoam = step(_FoamCutoff, foamTexture * edgeFoamMask) * _FoamStrength;
 ```
@@ -371,24 +371,24 @@ float edgeFoam = step(_FoamCutoff, foamTexture * edgeFoamMask) * _FoamStrength;
 
 ## 10. Planar Reflection
 
-### Amaç
-Su yüzeyinde gerçek zamanlı yansıma. Gökyüzü ve nesnelerin ayna görüntüsü.
+### Purpose
+Real-time reflection on water surface. Mirror image of sky and objects.
 
-### Nasıl Çalışır
-1. Ana kameranın yansıma pozisyonunu hesapla
-2. Reflection matrix ile kamerayı aynala
-3. Ayrı bir kamera ile sahneyi render et
-4. RenderTexture'ı shader'a gönder
+### How It Works
+1. Calculate main camera's reflection position
+2. Mirror the camera using reflection matrix
+3. Render scene with a separate camera
+4. Send RenderTexture to shader
 
-### C# Script (Özet)
+### C# Script (Summary)
 ```csharp
-// Reflection matrix hesapla
+// Calculate reflection matrix
 Matrix4x4 reflection = CalculateReflectionMatrix(reflectionPlane);
 
-// Kamerayı yansıma pozisyonuna taşı
+// Move camera to reflection position
 reflectionCamera.worldToCameraMatrix = mainCamera.worldToCameraMatrix * reflection;
 
-// Oblique projection (su altını kırp)
+// Oblique projection (clip underwater)
 Vector4 clipPlane = CameraSpacePlane(reflectionCamera, pos, normal);
 reflectionCamera.projectionMatrix = mainCamera.CalculateObliqueMatrix(clipPlane);
 
@@ -398,18 +398,18 @@ reflectionCamera.Render();
 GL.invertCulling = false;
 ```
 
-### Shader Kodu
+### Shader Code
 ```hlsl
 // Vertex shader
 o.reflectionPos = ComputeScreenPos(o.pos);
 
 // Fragment shader
 float2 reflectionUV = i.reflectionPos.xy / i.reflectionPos.w;
-reflectionUV.y = 1.0 - reflectionUV.y;  // Y ekseni ters
+reflectionUV.y = 1.0 - reflectionUV.y;  // Flip Y axis
 reflectionUV += normalBlend.xy * _ReflectionDistortion;
 float3 reflectionColor = tex2D(_ReflectionTex, reflectionUV).rgb;
 
-// Fresnel ile kontrol
+// Control with Fresnel
 finalColor = lerp(finalColor, reflectionColor, fresnel * _ReflectionStrength);
 ```
 
@@ -417,10 +417,10 @@ finalColor = lerp(finalColor, reflectionColor, fresnel * _ReflectionStrength);
 
 ## 11. Tessellation
 
-### Amaç
-GPU'da mesh'i dinamik olarak subdivide et:
-- Yakında çok detay (smooth dalgalar)
-- Uzakta az detay (performans)
+### Purpose
+Dynamically subdivide mesh on GPU:
+- More detail up close (smooth waves)
+- Less detail far away (performance)
 
 ### Pipeline
 ```
@@ -428,7 +428,7 @@ Vertex Shader → Hull Shader → Tessellator → Domain Shader → Fragment Sha
 ```
 
 ### Hull Shader
-Tessellation faktörlerini belirler:
+Determines tessellation factors:
 ```hlsl
 [domain("tri")]
 [outputcontrolpoints(3)]
@@ -454,7 +454,7 @@ float CalcDistanceTessFactor(float4 vertex)
 ```
 
 ### Domain Shader
-Yeni vertex'leri oluşturur ve Gerstner waves uygular:
+Creates new vertices and applies Gerstner waves:
 ```hlsl
 [domain("tri")]
 v2f domain(TessellationFactors factors, OutputPatch<TessellationControlPoint, 3> patch, 
@@ -465,26 +465,26 @@ v2f domain(TessellationFactors factors, OutputPatch<TessellationControlPoint, 3>
                     patch[1].vertex * barycentricCoordinates.y +
                     patch[2].vertex * barycentricCoordinates.z;
     
-    // Gerstner waves uygula
-    // ... (normal vertex shader işlemleri)
+    // Apply Gerstner waves
+    // ... (normal vertex shader operations)
 }
 ```
 
 ---
 
-## 🎯 Performans İpuçları
+## 🎯 Performance Tips
 
-| Özellik | GPU Cost | Optimizasyon |
+| Feature | GPU Cost | Optimization |
 |---------|----------|--------------|
-| Tessellation | Yüksek | Distance-based LOD kullan |
-| Planar Reflection | Yüksek | Düşük resolution (256-512) |
-| GrabPass | Orta | Tek seferde kullan |
-| Caustics | Düşük | Loop iteration azalt |
-| Normal Mapping | Düşük | Texture boyutu optimize |
+| Tessellation | High | Use distance-based LOD |
+| Planar Reflection | High | Low resolution (256-512) |
+| GrabPass | Medium | Use once |
+| Caustics | Low | Reduce loop iterations |
+| Normal Mapping | Low | Optimize texture size |
 
 ---
 
-## 📚 Kaynaklar
+## 📚 Resources
 
 - [GPU Gems: Effective Water Simulation](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models)
 - [Catlike Coding: Flow](https://catlikecoding.com/unity/tutorials/flow/)
@@ -493,11 +493,11 @@ v2f domain(TessellationFactors factors, OutputPatch<TessellationControlPoint, 3>
 
 ---
 
-## 👤 Yazar
+## 👤 Author
 
 **Samet Karaş**
 - GitHub: [@SametKaras](https://github.com/SametKaras)
 
 ---
 
-*Bu breakdown, shader'daki her tekniğin nasıl çalıştığını anlamak isteyenler için hazırlanmıştır.*
+*This breakdown is prepared for those who want to understand how each technique in the shader works.*
