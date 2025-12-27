@@ -150,6 +150,7 @@ MIT License - Feel free to use in your projects!
 
 **Samet Karaş**
 - GitHub: [@SametKaras](https://github.com/SametKaras)
+- LinkedIn: [@Samet Karaş](https://www.linkedin.com/in/sametkaras/)
 
 ---
 
